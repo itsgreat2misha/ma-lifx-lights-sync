@@ -27,10 +27,10 @@ The direct HA credentials are collected by the setup flow
 (``setup_flow.py``) and stored as the instance's ``setup_data``,
 following the pattern of Music Assistant's own ``hass`` provider;
 they are read back via ``get_setup_value`` in :meth:`_resolved_settings`.
-Installs that predate the setup flow keep working: ``get_setup_value``
-itself falls back to the stored config values on current servers, and
-on older servers without setup-flow support the provider reads those
-same config values directly.
+``get_setup_value`` itself falls back to the stored config values when
+a key is not present in ``setup_data``, so credentials that were
+entered in the options form before the setup flow existed keep
+working untouched.
 """
 
 from __future__ import annotations
@@ -48,6 +48,8 @@ from .bridge import LifxBridgeManager
 from .discovery import (
     HaDiscoveryError,
     HaLifxLight,
+    LanDevice,
+    SyncTarget,
     apply_sweep_results,
     discover_lan,
     fetch_ha_lifx_lights,
@@ -234,21 +236,15 @@ class LifxLightsSyncProvider(PluginProvider):
         Build settings from a config, overlaying setup-flow credentials.
 
         The direct Home Assistant URL/token are collected by the setup
-        flow and stored as ``setup_data``; on servers that support it
-        they are read via ``get_setup_value`` (which itself falls back
-        to the stored config values, so installs that entered the
-        credentials in the old options form keep working untouched).
-        On older servers without ``get_setup_value``, the config values
-        are used as-is.
+        flow and stored as ``setup_data``; they are read via
+        ``get_setup_value``, which itself falls back to the stored
+        config values for keys absent from ``setup_data``.
         """
         settings = PluginSettings.from_config(config)
-        get_setup_value = getattr(self, "get_setup_value", None)
-        if not callable(get_setup_value):
-            return settings
         return resolve_ha_credentials(
             settings,
-            get_setup_value(const.CONF_HA_URL, None),
-            get_setup_value(const.CONF_HA_TOKEN, None),
+            self.get_setup_value(const.CONF_HA_URL, None),
+            self.get_setup_value(const.CONF_HA_TOKEN, None),
         )
 
     async def _delayed_rediscovery(self) -> None:
@@ -273,7 +269,7 @@ class LifxLightsSyncProvider(PluginProvider):
         self._devices = {}
         await self._discover_and_setup()
 
-    async def _discover_and_setup(self) -> bool:  # noqa: PLR0915 - one linear orchestration flow
+    async def _discover_and_setup(self) -> bool:
         """Run discovery and bridge setup; True if HA-sourced."""
         settings = self._settings
         source = settings.discovery_source
@@ -343,28 +339,7 @@ class LifxLightsSyncProvider(PluginProvider):
             ", ".join(target.name for target in targets),
         )
 
-        # Unicast sweep: broadcast discovery misses many bulbs across
-        # VLANs, and HA's config_entries/get strips entry data, so the
-        # host HA stores is not API-readable. Probe the subnets where
-        # lights are already known to live for every serial still
-        # missing an IP (raw GetService; see discovery.sweep_for_serials).
-        missing_serials = {
-            light.serial for target in targets for light in target.lights if not light.ip
-        }
-        if missing_serials:
-            seed_ips = [device.ip for device in lan_devices if device.ip]
-            seed_ips += [light.ip for target in targets for light in target.lights if light.ip]
-            try:
-                found = await sweep_for_serials(missing_serials, seed_ips)
-            except Exception:
-                self.logger.warning("LIFX unicast sweep failed", exc_info=True)
-                found = {}
-            filled = apply_sweep_results(targets, found)
-            self.logger.info(
-                "Unicast sweep found %d of %d lights missing an IP",
-                filled,
-                len(missing_serials),
-            )
+        await self._sweep_missing_ips(targets, lan_devices)
 
         # Open typed devices (Light/MatrixLight/CeilingLight per light
         # shape — a base Device has no color methods at all).
@@ -379,6 +354,37 @@ class LifxLightsSyncProvider(PluginProvider):
         await self._bridge_manager.setup_bridges(targets, self._devices)
         self.available = bool(self._bridge_manager.bridges)
         return ha_source_used is not None
+
+    async def _sweep_missing_ips(
+        self, targets: list[SyncTarget], lan_devices: list[LanDevice]
+    ) -> None:
+        """
+        Unicast-sweep for target lights still missing an IP address.
+
+        Broadcast discovery misses many bulbs across VLANs, and HA's
+        config_entries/get strips entry data, so the host HA stores is
+        not API-readable. Probe the subnets where lights are already
+        known to live for every serial still missing an IP (raw
+        GetService; see discovery.sweep_for_serials).
+        """
+        missing_serials = {
+            light.serial for target in targets for light in target.lights if not light.ip
+        }
+        if not missing_serials:
+            return
+        seed_ips = [device.ip for device in lan_devices if device.ip]
+        seed_ips += [light.ip for target in targets for light in target.lights if light.ip]
+        try:
+            found = await sweep_for_serials(missing_serials, seed_ips)
+        except Exception:
+            self.logger.warning("LIFX unicast sweep failed", exc_info=True)
+            found = {}
+        filled = apply_sweep_results(targets, found)
+        self.logger.info(
+            "Unicast sweep found %d of %d lights missing an IP",
+            filled,
+            len(missing_serials),
+        )
 
     async def _discover_via_hass_provider(
         self, required: bool

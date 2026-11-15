@@ -332,8 +332,6 @@ def apply_ha_hosts(
     Lights without a matching entry keep ``host=None`` (the LAN sweep
     may still fill the gap at merge time).
     """
-    from dataclasses import replace  # noqa: PLC0415 - tiny, keeps top imports lean
-
     combined: list[HaLifxLight] = []
     for light in lights:
         host = hosts_by_serial.get(light.serial)
@@ -823,16 +821,6 @@ def apply_sweep_results(targets: Sequence[SyncTarget], found: Mapping[str, str])
     return filled
 
 
-async def discover_targets(
-    ha_lights: Sequence[HaLifxLight],
-    timeout_s: float = const.LAN_DISCOVERY_TIMEOUT_S,
-    include_lan_only: bool = True,
-) -> tuple[list[SyncTarget], list[LanDevice]]:
-    """Run LAN discovery and merge with HA lights (convenience wrapper)."""
-    lan_devices = await discover_lan(timeout_s)
-    return merge_targets(ha_lights, lan_devices, include_lan_only), lan_devices
-
-
 __all__ = [
     "HaDiscoveryError",
     "HaLifxLight",
@@ -843,7 +831,6 @@ __all__ = [
     "apply_sweep_results",
     "build_get_service_packet",
     "discover_lan",
-    "discover_targets",
     "fetch_ha_lifx_lights",
     "merge_targets",
     "normalize_serial",
