@@ -125,10 +125,8 @@ target — that is intentional: the two targets render differently.
 
 This is a custom provider for Music Assistant, not a published add-on
 yet. It requires Music Assistant server **2.10 or newer** — the setup
-flow in step 4 only exists there. On older servers the provider still
-loads and reads any previously stored HA URL/token from its stored
-settings, but the setup flow is unavailable; that fallback is legacy
-behaviour, not the supported path.
+flow in step 4 only exists there, and the provider does not run on
+older servers.
 
 1. Download this repository (the green **Code** button → **Download
    ZIP**, or `git clone
@@ -181,8 +179,7 @@ needed). Discovery source takes effect on the next provider load.
 settings before the setup flow existed keep working unchanged — the
 stored values are still read. They move into the encrypted setup-data
 store the first time you run the setup/reconfigure flow and submit
-the form. On Music Assistant versions without setup-flow support,
-nothing changes at all: the stored settings values are used directly.
+the form.
 
 ## Architecture / file map
 

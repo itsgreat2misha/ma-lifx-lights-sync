@@ -14,6 +14,7 @@
     "multi_instance": true,
     "name": "LIFX Lights Sync",
     "requirements": [
+        "aiohttp==3.14.4",
         "lifx-async==8.0.0"
     ],
     "stage": "alpha",

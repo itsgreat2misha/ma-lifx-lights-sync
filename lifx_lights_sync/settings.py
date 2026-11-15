@@ -157,11 +157,12 @@ def resolve_ha_credentials(
     Overlay setup-flow credentials onto config-derived settings.
 
     ``setup_url``/``setup_token`` are the values from the provider's
-    ``setup_data`` (via ``get_setup_value``); a value that is not None
-    wins over the config-derived one, including an empty string (the
-    user cleared the credential in the setup flow). None means the
-    setup flow never ran, so the legacy config value - entered in the
-    options form by installs that predate the setup flow - is kept.
+    ``setup_data`` (via ``get_setup_value``, which falls back to the
+    stored config values for keys absent from ``setup_data``); a value
+    that is not None wins over the config-derived one, including an
+    empty string (the user cleared the credential in the setup flow).
+    None means the setup flow never supplied the key, so the
+    config-derived value is kept.
     """
     if setup_url is None and setup_token is None:
         return base

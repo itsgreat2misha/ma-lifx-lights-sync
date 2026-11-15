@@ -17,9 +17,8 @@ fields may therefore be left empty; the flow then finishes with empty
 values and the plugin relies on the hass provider / LAN.
 
 This module is only ever loaded by Music Assistant's setup-flow
-engine (server 2.10+); on older servers it is simply never imported,
-and the provider keeps reading the same keys from its stored config
-values, so existing installs are unaffected.
+engine; the provider requires server 2.10 or newer, which always
+provides it.
 """
 
 from __future__ import annotations

@@ -11,6 +11,19 @@ itself remains `stage: alpha` in the manifest.
 
 ## [Unreleased]
 
+### Changed
+
+- The provider now calls Music Assistant's `get_setup_value`
+  directly instead of guarding for servers without setup-flow
+  support. No behaviour change on supported servers (2.10+):
+  `get_setup_value` itself falls back to the stored config values
+  for keys absent from `setup_data`.
+- The manifest now declares the `aiohttp` requirement used by the
+  direct Home Assistant discovery path.
+- Internal tidy-up: the unicast sweep block moved out of the main
+  discovery orchestration into its own method, and a dead
+  `discover_targets()` helper was removed.
+
 ## [1.0.0] - 2026-11-13
 
 First public release.
